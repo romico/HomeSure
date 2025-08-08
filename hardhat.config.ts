@@ -1,5 +1,5 @@
 import { HardhatUserConfig } from 'hardhat/config';
-import '@nomiclabs/hardhat-ethers';
+import '@nomicfoundation/hardhat-ethers';
 import '@nomiclabs/hardhat-etherscan';
 import '@openzeppelin/hardhat-upgrades';
 import '@typechain/hardhat';
@@ -75,7 +75,7 @@ const config: HardhatUserConfig = {
   },
   typechain: {
     outDir: 'typechain-types',
-    target: 'ethers-v5',
+    target: 'ethers-v6',
   },
 };
 
