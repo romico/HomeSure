@@ -1,0 +1,62 @@
+{
+  "name": "homesure-backend",
+  "version": "1.0.0",
+  "description": "HomeSure Backend API Server",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "NODE_ENV=development nodemon src/server.js",
+    "staging": "NODE_ENV=staging node src/server.js",
+    "prod": "NODE_ENV=production node src/server.js",
+    "test": "jest",
+    "lint": "eslint src/",
+    "build": "echo 'No build step required for Node.js'",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:seed": "node prisma/seed.js",
+    "db:studio": "prisma studio"
+  },
+  "keywords": [
+    "blockchain",
+    "real-estate",
+    "tokenization",
+    "api"
+  ],
+  "author": "HomeSure Team",
+  "license": "MIT",
+  "dependencies": {
+    "@ethersproject/contracts": "^5.8.0",
+    "@ethersproject/providers": "^5.8.0",
+    "@prisma/client": "^6.13.0",
+    "axios": "^1.11.0",
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "crypto-js": "^4.2.0",
+    "dotenv": "^16.3.1",
+    "ethers": "^6.11.1",
+    "express": "^4.18.2",
+    "express-rate-limit": "^7.1.5",
+    "express-slow-down": "^3.0.0",
+    "express-validator": "^7.0.1",
+    "helmet": "^7.1.0",
+    "ioredis": "^5.7.0",
+    "jsonwebtoken": "^9.0.2",
+    "morgan": "^1.10.0",
+    "multer": "^2.0.2",
+    "opossum": "^9.0.0",
+    "prisma": "^6.13.0",
+    "redis": "^5.7.0",
+    "winston": "^3.11.0",
+    "ws": "^8.18.3"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/jsonwebtoken": "^9.0.5",
+    "@types/node": "^20.10.5",
+    "jest": "^30.0.5",
+    "nodemon": "^3.0.2"
+  },
+  "type": "commonjs"
+}

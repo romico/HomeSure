@@ -1,0 +1,73 @@
+import { expect } from 'chai';
+import { ethers } from 'hardhat';
+import { Contract, ContractFactory } from 'ethers';
+import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
+
+describe('PropertyToken', function () {
+  let PropertyToken: ContractFactory;
+  let propertyToken: Contract;
+  let owner: SignerWithAddress;
+  let addr1: SignerWithAddress;
+  let addr2: SignerWithAddress;
+
+  beforeEach(async function () {
+    // Get signers
+    [owner, addr1, addr2] = await ethers.getSigners();
+
+    // Deploy contract
+    PropertyToken = await ethers.getContractFactory('PropertyToken');
+    propertyToken = await PropertyToken.deploy();
+    await propertyToken.deployed();
+  });
+
+  describe('Deployment', function () {
+    it('Should set the right owner', async function () {
+      expect(await propertyToken.owner()).to.equal(owner.address);
+    });
+
+    it('Should have correct name and symbol', async function () {
+      expect(await propertyToken.name()).to.equal('HomeSure Property Token');
+      expect(await propertyToken.symbol()).to.equal('HSPT');
+    });
+
+    it('Should have zero total supply initially', async function () {
+      expect(await propertyToken.totalSupply()).to.equal(0);
+    });
+  });
+
+  describe('Access Control', function () {
+    it('Should allow owner to grant roles', async function () {
+      const ISSUER_ROLE = await propertyToken.ISSUER_ROLE();
+      await propertyToken.grantRole(ISSUER_ROLE, addr1.address);
+      expect(await propertyToken.hasRole(ISSUER_ROLE, addr1.address)).to.be.true;
+    });
+
+    it('Should not allow non-owner to grant roles', async function () {
+      const ISSUER_ROLE = await propertyToken.ISSUER_ROLE();
+      await expect(
+        propertyToken.connect(addr1).grantRole(ISSUER_ROLE, addr2.address)
+      ).to.be.revertedWith('AccessControl');
+    });
+  });
+
+  describe('Token Operations', function () {
+    beforeEach(async function () {
+      // Grant issuer role to addr1
+      const ISSUER_ROLE = await propertyToken.ISSUER_ROLE();
+      await propertyToken.grantRole(ISSUER_ROLE, addr1.address);
+    });
+
+    it('Should allow issuer to issue tokens', async function () {
+      const amount = ethers.utils.parseEther('1000');
+      await propertyToken.connect(addr1).issueTokens(addr2.address, amount);
+      expect(await propertyToken.balanceOf(addr2.address)).to.equal(amount);
+    });
+
+    it('Should not allow non-issuer to issue tokens', async function () {
+      const amount = ethers.utils.parseEther('1000');
+      await expect(
+        propertyToken.connect(addr2).issueTokens(addr1.address, amount)
+      ).to.be.revertedWith('AccessControl');
+    });
+  });
+});

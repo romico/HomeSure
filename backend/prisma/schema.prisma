@@ -1,0 +1,776 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User model
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  firstName String?
+  lastName  String?
+  phone     String?
+  address   String?
+  city      String?
+  country   String?
+  postalCode String?
+  dateOfBirth DateTime?
+  kycStatus KYCStatus @default(PENDING)
+  isActive  Boolean  @default(true)
+  role      UserRole @default(USER)
+  walletAddress String? @unique
+  deletedAt DateTime?
+  deletionRequestId String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  properties    Property[]
+  transactions  Transaction[]
+  kycRecords    KYCRecord[]
+  portfolio     Portfolio[]
+  valuations    Valuation[]
+  disputes      Dispute[]       @relation("UserDisputes")
+  expertReviews ExpertReview[]
+  sessions      UserSession[]
+  userVerifications UserVerification[]
+  whitelistEntries WhitelistEntry[]
+  gdprConsents GDPRConsent[]
+  dataDeletionRequests DataDeletionRequest[]
+  amlTransactions AMLTransaction[]
+  kycSessions   KYCSession[]
+  orders        Order[]
+  escrows       Escrow[]
+
+  @@map("users")
+}
+
+// Property model
+model Property {
+  id              String        @id @default(cuid())
+  propertyId      Int           @unique @default(autoincrement())
+  title           String
+  description     String?
+  location        String
+  city            String
+  country         String
+  postalCode      String
+  propertyType    PropertyType
+  totalValue      Decimal       @db.Decimal(20, 8)
+  landArea        Decimal?      @db.Decimal(10, 2)
+  buildingArea    Decimal?      @db.Decimal(10, 2)
+  yearBuilt       Int?
+  status          PropertyStatus @default(PENDING)
+  isTokenized     Boolean       @default(false)
+  tokenContractId String?
+  metadata        Json?
+  documents       Document[]
+  ownershipHistory OwnershipHistory[]
+  valuations      Valuation[]
+  transactions    Transaction[]
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  // Relations
+  ownerId         String
+  owner           User          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  orders          Order[]
+  trades          Trade[]
+
+  @@map("properties")
+}
+
+// Document model
+model Document {
+  id              String        @id @default(cuid())
+  propertyId      String
+  documentType    DocumentType
+  fileName        String
+  fileHash        String        @unique
+  ipfsHash        String?
+  version         String        @default("1.0")
+  isEncrypted     Boolean       @default(false)
+  encryptionKey   String?
+  isVerified      Boolean       @default(false)
+  verifiedBy      String?
+  verifiedAt      DateTime?
+  verificationNotes String?
+  isActive        Boolean       @default(true)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  // Relations
+  property        Property      @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@map("documents")
+}
+
+// Transaction model
+model Transaction {
+  id              String        @id @default(cuid())
+  transactionHash String        @unique
+  propertyId      String
+  fromAddress     String
+  toAddress       String
+  amount          Decimal       @db.Decimal(20, 8)
+  tokenAmount     Decimal?      @db.Decimal(20, 8)
+  transactionType TransactionType
+  status          TransactionStatus @default(PENDING)
+  gasUsed         Int?
+  gasPrice        Decimal?      @db.Decimal(20, 8)
+  blockNumber     Int?
+  metadata        Json?
+  isAnonymized    Boolean       @default(false)
+  anonymizedAt    DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  // Relations
+  userId          String
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  property        Property      @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@map("transactions")
+}
+
+// Order model for trading system
+model Order {
+  id                String        @id @default(cuid())
+  orderId           Int           @unique @default(autoincrement())
+  propertyId        Int
+  userId            String
+  orderType         String        // BUY or SELL
+  price             Decimal       @db.Decimal(20, 8)
+  quantity          Decimal       @db.Decimal(20, 8)
+  filledQuantity    Decimal       @db.Decimal(20, 8) @default(0)
+  remainingQuantity Decimal       @db.Decimal(20, 8)
+  expiryTime        DateTime
+  status            String        @default("OPEN") // OPEN, PARTIAL, FILLED, CANCELLED, EXPIRED
+  transactionHash   String?
+  blockchainOrderId String?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  // Relations
+  user              User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  property          Property      @relation(fields: [propertyId], references: [propertyId], onDelete: Cascade)
+
+  @@map("orders")
+}
+
+// Trade model for executed trades
+model Trade {
+  id                String        @id @default(cuid())
+  tradeId           Int           @unique @default(autoincrement())
+  buyOrderId        Int
+  sellOrderId       Int
+  propertyId        Int
+  buyerAddress      String
+  sellerAddress     String
+  price             Decimal       @db.Decimal(20, 8)
+  quantity          Decimal       @db.Decimal(20, 8)
+  totalAmount       Decimal       @db.Decimal(20, 8)
+  platformFee       Decimal?      @db.Decimal(20, 8)
+  buyerFee          Decimal?      @db.Decimal(20, 8)
+  sellerFee         Decimal?      @db.Decimal(20, 8)
+  status            String        @default("EXECUTED") // EXECUTED, PENDING, FAILED
+  transactionHash   String?
+  blockchainTradeId String?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  // Relations
+  property          Property      @relation(fields: [propertyId], references: [propertyId], onDelete: Cascade)
+  escrows           Escrow[]
+
+  @@map("trades")
+}
+
+// Escrow model for trade escrow
+model Escrow {
+  id                String        @id @default(cuid())
+  escrowId          Int           @unique @default(autoincrement())
+  tradeId           Int
+  amount            Decimal       @db.Decimal(20, 8)
+  conditions        String
+  status            String        @default("PENDING") // PENDING, RELEASED, REFUNDED
+  transactionHash   String?
+  blockchainEscrowId String?
+  createdBy         String
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  // Relations
+  trade             Trade         @relation(fields: [tradeId], references: [tradeId], onDelete: Cascade)
+  creator           User          @relation(fields: [createdBy], references: [id], onDelete: Cascade)
+
+  @@map("escrows")
+}
+
+// Portfolio model
+model Portfolio {
+  id              String        @id @default(cuid())
+  userId          String        @unique
+  totalValue      Decimal       @db.Decimal(20, 8) @default(0)
+  totalTokens     Decimal       @db.Decimal(20, 8) @default(0)
+  propertiesCount Int           @default(0)
+  performance     Json?
+  lastUpdated     DateTime      @default(now())
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  // Relations
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("portfolios")
+}
+
+// KYC Record model
+model KYCRecord {
+  id              String        @id @default(cuid())
+  userId          String        @unique
+  documentType    DocumentType
+  documentNumber  String
+  documentHash    String
+  verificationStatus KYCStatus  @default(PENDING)
+  verifiedBy      String?
+  verifiedAt      DateTime?
+  rejectionReason String?
+  metadata        Json?
+  isAnonymized    Boolean       @default(false)
+  anonymizedAt    DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  // Relations
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("kyc_records")
+}
+
+// Ownership History model
+model OwnershipHistory {
+  id              String        @id @default(cuid())
+  propertyId      String
+  previousOwner   String?
+  newOwner        String
+  transferAmount  Decimal       @db.Decimal(20, 8)
+  tokenAmount     Decimal?      @db.Decimal(20, 8)
+  ownershipPercentage Decimal?  @db.Decimal(5, 2)
+  transferReason  String?
+  transactionHash String?
+  createdAt       DateTime      @default(now())
+
+  // Relations
+  property        Property      @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@map("ownership_history")
+}
+
+// Valuation model
+model Valuation {
+  id              String        @id @default(cuid())
+  propertyId      String
+  originalValue   Decimal       @db.Decimal(20, 8)
+  evaluatedValue  Decimal?      @db.Decimal(20, 8)
+  marketValue     Decimal?      @db.Decimal(20, 8)
+  confidenceScore Int?
+  status          ValuationStatus @default(PENDING)
+  method          ValuationMethod
+  reportHash      String
+  notes           String?
+  isDisputed      Boolean       @default(false)
+  createdAt       DateTime      @default(now())
+  completedAt     DateTime?
+  updatedAt       DateTime      @updatedAt
+
+  // Relations
+  valuatorId      String
+  valuator        User          @relation(fields: [valuatorId], references: [id], onDelete: Cascade)
+  property        Property      @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  disputes        Dispute[]
+  expertReviews   ExpertReview[]
+
+  @@map("valuations")
+}
+
+// Dispute model
+model Dispute {
+  id              String        @id @default(cuid())
+  valuationId     String
+  appellant       String
+  proposedValue   Decimal       @db.Decimal(20, 8)
+  reason          String
+  isResolved      Boolean       @default(false)
+  resolution      String?
+  resolvedAt      DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  // Relations
+  valuation       Valuation     @relation(fields: [valuationId], references: [id], onDelete: Cascade)
+  appellantUser   User?         @relation("UserDisputes", fields: [appellant], references: [id], onDelete: Cascade)
+
+  @@map("disputes")
+}
+
+// Expert Review model
+model ExpertReview {
+  id              String        @id @default(cuid())
+  valuationId     String
+  expertId        String
+  isApproved      Boolean
+  confidenceScore Int
+  comments        String?
+  fee             Decimal?      @db.Decimal(20, 8)
+  reviewedAt      DateTime      @default(now())
+  createdAt       DateTime      @default(now())
+
+  // Relations
+  valuation       Valuation     @relation(fields: [valuationId], references: [id], onDelete: Cascade)
+  expert          User          @relation(fields: [expertId], references: [id], onDelete: Cascade)
+
+  @@map("expert_reviews")
+}
+
+// Oracle Data model
+model OracleData {
+  id              String        @id @default(cuid())
+  propertyId      String
+  dataType        DataType
+  sourceType      SourceType
+  dataSource      String
+  value           Decimal       @db.Decimal(20, 8)
+  confidence      Int?
+  reliability     ReliabilityLevel
+  isVerified      Boolean       @default(false)
+  metadata        Json?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@map("oracle_data")
+}
+
+// Blacklisted Token model
+model BlacklistedToken {
+  id             String   @id @default(cuid())
+  token          String   @unique
+  userId         String
+  expiresAt      DateTime
+  reason         String   @default("logout")
+  blacklistedAt  DateTime @default(now())
+
+  @@map("blacklisted_tokens")
+}
+
+// User Session model
+model UserSession {
+  id           String   @id @default(cuid())
+  userId       String
+  sessionToken String   @unique
+  refreshToken String?  @unique
+  userAgent    String?
+  ipAddress    String?
+  isActive     Boolean  @default(true)
+  lastActivity DateTime @default(now())
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_sessions")
+}
+
+// User Verification model (KYC)
+model UserVerification {
+  id                String        @id @default(cuid())
+  userId            String        @unique
+  sessionId         String        @unique
+  verificationStatus VerificationStatus @default(PENDING)
+  documentType      String?
+  documentNumber    String?
+  documentHash      String?
+  country           String?
+  firstName         String?
+  lastName          String?
+  dateOfBirth       DateTime?
+  verificationDate  DateTime?
+  rejectionReason   String?
+  isDocumentAuthentic Boolean?
+  documentConfidence Decimal?     @db.Decimal(3, 2)
+  isFaceMatch       Boolean?
+  faceConfidence    Decimal?      @db.Decimal(3, 2)
+  metadata          Json?
+  isEncrypted       Boolean       @default(true)
+  encryptionKey     String?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  // Relations
+  user              User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  amlTransactions   AMLTransaction[]
+  whitelistEntry    WhitelistEntry?
+
+  @@map("user_verifications")
+}
+
+// KYC Session model
+model KYCSession {
+  id              String        @id @default(cuid())
+  sessionId       String        @unique
+  userId          String
+  status          KYCSessionStatus @default(ACTIVE)
+  redirectUrl     String?
+  expiresAt       DateTime
+  callbackData    Json?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  // Relations
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("kyc_sessions")
+}
+
+// Whitelist Entry model
+model WhitelistEntry {
+  id              String        @id @default(cuid())
+  userId          String        @unique
+  verificationId  String        @unique
+  status          WhitelistStatus @default(ACTIVE)
+  approvedBy      String?
+  approvedAt      DateTime?
+  reason          String?
+  expiresAt       DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  // Relations
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  verification    UserVerification @relation(fields: [verificationId], references: [id], onDelete: Cascade)
+
+  @@map("whitelist_entries")
+}
+
+// AML Transaction model
+model AMLTransaction {
+  id              String        @id @default(cuid())
+  transactionId   String        @unique
+  userId          String
+  verificationId  String
+  amount          Decimal       @db.Decimal(20, 8)
+  currency        String        @default("USD")
+  transactionType AMLTransactionType
+  riskScore       Int           @default(0)
+  riskFactors     Json?
+  isFlagged       Boolean       @default(false)
+  flagReason      String?
+  isBlocked       Boolean       @default(false)
+  blockReason     String?
+  metadata        Json?
+  isAnonymized    Boolean       @default(false)
+  anonymizedAt    DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  // Relations
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  verification    UserVerification @relation(fields: [verificationId], references: [id], onDelete: Cascade)
+  alerts          AMLAlert[]
+
+  @@map("aml_transactions")
+}
+
+// AML Alert model
+model AMLAlert {
+  id              String        @id @default(cuid())
+  transactionId   String
+  alertType       AMLAlertType
+  severity        AlertSeverity @default(MEDIUM)
+  description     String
+  riskScore       Int
+  isResolved      Boolean       @default(false)
+  resolvedBy      String?
+  resolvedAt      DateTime?
+  resolution      String?
+  metadata        Json?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  // Relations
+  transaction     AMLTransaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+
+  @@map("aml_alerts")
+}
+
+// GDPR Consent model
+model GDPRConsent {
+  id              String        @id @default(cuid())
+  userId          String
+  consentType     ConsentType
+  isGranted       Boolean       @default(false)
+  grantedAt       DateTime?
+  revokedAt       DateTime?
+  ipAddress       String?
+  userAgent       String?
+  metadata        Json?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  // Relations
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("gdpr_consents")
+}
+
+// Data Deletion Request model
+model DataDeletionRequest {
+  id              String        @id @default(cuid())
+  userId          String
+  requestType     DeletionRequestType
+  status          DeletionRequestStatus @default(PENDING)
+  requestedAt     DateTime      @default(now())
+  processedAt     DateTime?
+  processedBy     String?
+  reason          String?
+  metadata        Json?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  // Relations
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("data_deletion_requests")
+}
+
+// Data Archive model
+model DataArchive {
+  id              String        @id @default(cuid())
+  originalId      String
+  dataType        String
+  encryptedData   String
+  iv              String
+  tag             String
+  algorithm       String
+  archivedAt      DateTime      @default(now())
+  retentionUntil  DateTime
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@map("data_archives")
+}
+
+// Access Log model
+model AccessLog {
+  id              String        @id @default(cuid())
+  userId          String
+  action          String
+  resource        String
+  metadata        Json?
+  timestamp       DateTime      @default(now())
+  ipAddress       String?
+  userAgent       String?
+  createdAt       DateTime      @default(now())
+
+  @@map("access_logs")
+}
+
+// Enums
+enum UserRole {
+  USER
+  ADMIN
+  REGISTRAR
+  VALUATOR
+  EXPERT
+  ORACLE
+}
+
+enum KYCStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  EXPIRED
+}
+
+enum PropertyType {
+  APARTMENT
+  HOUSE
+  COMMERCIAL
+  LAND
+  OFFICE
+  RETAIL
+  INDUSTRIAL
+  OTHER
+}
+
+enum PropertyStatus {
+  PENDING
+  ACTIVE
+  SOLD
+  SUSPENDED
+  CANCELLED
+}
+
+enum DocumentType {
+  REGISTRATION_CERTIFICATE
+  VALUATION_REPORT
+  CONTRACT
+  IDENTITY_DOCUMENT
+  PROOF_OF_ADDRESS
+  FINANCIAL_STATEMENT
+  OTHER
+}
+
+enum TransactionType {
+  TOKEN_PURCHASE
+  TOKEN_SALE
+  TOKEN_TRANSFER
+  PROPERTY_PURCHASE
+  PROPERTY_SALE
+  VALUATION_FEE
+  DISPUTE_FEE
+  OTHER
+}
+
+enum TransactionStatus {
+  PENDING
+  CONFIRMED
+  FAILED
+  CANCELLED
+}
+
+enum ValuationStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  DISPUTED
+  RE_EVALUATING
+  FINALIZED
+}
+
+enum ValuationMethod {
+  COMPARABLE_SALES
+  INCOME_CAPITALIZATION
+  COST_APPROACH
+  DISCOUNTED_CASH_FLOW
+  AUTOMATED_MODEL
+  EXPERT_OPINION
+}
+
+enum DataType {
+  PROPERTY_PRICE
+  MARKET_TREND
+  RENTAL_RATE
+  INTEREST_RATE
+  ECONOMIC_INDICATOR
+  REGULATORY_INFO
+  WEATHER_DATA
+  CRIME_RATE
+  INFRASTRUCTURE
+  OTHER
+}
+
+enum SourceType {
+  CHAINLINK
+  API3
+  BAND_PROTOCOL
+  NEST_PROTOCOL
+  CUSTOM_API
+  MANUAL_ENTRY
+  GOVERNMENT_DATA
+  REAL_ESTATE_AGENCY
+  APPRAISAL_FIRM
+  OTHER_SOURCE
+}
+
+enum ReliabilityLevel {
+  LOW
+  MEDIUM
+  HIGH
+  VERY_HIGH
+}
+
+// KYC/AML related enums
+enum VerificationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  EXPIRED
+  UNDER_REVIEW
+}
+
+enum KYCSessionStatus {
+  ACTIVE
+  COMPLETED
+  EXPIRED
+  CANCELLED
+}
+
+enum WhitelistStatus {
+  ACTIVE
+  SUSPENDED
+  EXPIRED
+  REVOKED
+}
+
+enum AMLTransactionType {
+  TOKEN_PURCHASE
+  TOKEN_SALE
+  TOKEN_TRANSFER
+  WITHDRAWAL
+  DEPOSIT
+  EXCHANGE
+  OTHER
+}
+
+enum AMLAlertType {
+  HIGH_VALUE_TRANSACTION
+  FREQUENT_TRANSACTIONS
+  SUSPICIOUS_PATTERN
+  SANCTIONS_MATCH
+  PEP_MATCH
+  GEOGRAPHIC_RISK
+  STRUCTURED_TRANSACTION
+  UNUSUAL_ACTIVITY
+}
+
+enum AlertSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum ConsentType {
+  DATA_PROCESSING
+  MARKETING
+  THIRD_PARTY_SHARING
+  COOKIES
+  ANALYTICS
+  SECURITY
+}
+
+enum DeletionRequestType {
+  ACCOUNT_DELETION
+  DATA_ANONYMIZATION
+  SPECIFIC_DATA_DELETION
+  PORTABILITY_REQUEST
+}
+
+enum DeletionRequestStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  REJECTED
+  CANCELLED
+}

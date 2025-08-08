@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket 연결 테스트</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .connected { background-color: #d4edda; color: #155724; }
+        .disconnected { background-color: #f8d7da; color: #721c24; }
+        .connecting { background-color: #fff3cd; color: #856404; }
+        .log {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 10px;
+            height: 300px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background-color: #0056b3; }
+        button:disabled { background-color: #6c757d; cursor: not-allowed; }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            margin: 20px 0;
+        }
+        .stat-card {
+            background: #e9ecef;
+            padding: 15px;
+            border-radius: 4px;
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #007bff;
+        }
+        .stat-label {
+            font-size: 12px;
+            color: #6c757d;
+            text-transform: uppercase;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>WebSocket 연결 테스트</h1>
+        
+        <div id="status" class="status disconnected">연결되지 않음</div>
+        
+        <div>
+            <button id="connectBtn" onclick="connect()">연결</button>
+            <button id="disconnectBtn" onclick="disconnect()" disabled>연결 해제</button>
+            <button id="testBtn" onclick="sendTestMessage()" disabled>테스트 메시지 전송</button>
+            <button onclick="clearLog()">로그 지우기</button>
+        </div>
+        
+        <div class="stats" id="stats">
+            <div class="stat-card">
+                <div class="stat-value" id="totalClients">0</div>
+                <div class="stat-label">총 클라이언트</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="priceSubscriptions">0</div>
+                <div class="stat-label">가격 구독</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="portfolioSubscriptions">0</div>
+                <div class="stat-label">포트폴리오 구독</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="transactionSubscriptions">0</div>
+                <div class="stat-label">거래 구독</div>
+            </div>
+        </div>
+        
+        <h3>연결 로그</h3>
+        <div id="log" class="log"></div>
+    </div>
+
+    <script>
+        let ws = null;
+        let reconnectAttempts = 0;
+        const maxReconnectAttempts = 5;
+        
+        function log(message) {
+            const logDiv = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            logDiv.innerHTML += `[${timestamp}] ${message}\n`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+        
+        function updateStatus(status, message) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.className = `status ${status}`;
+            statusDiv.textContent = message;
+        }
+        
+        function updateStats() {
+            fetch('http://localhost:3001/api/websocket/stats')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('totalClients').textContent = data.totalClients;
+                    document.getElementById('priceSubscriptions').textContent = data.priceSubscriptions;
+                    document.getElementById('portfolioSubscriptions').textContent = data.portfolioSubscriptions;
+                    document.getElementById('transactionSubscriptions').textContent = data.transactionSubscriptions;
+                })
+                .catch(error => {
+                    log(`통계 조회 실패: ${error.message}`);
+                });
+        }
+        
+        function connect() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                log('이미 연결되어 있습니다.');
+                return;
+            }
+            
+            updateStatus('connecting', '연결 중...');
+            log('WebSocket 연결 시도 중...');
+            
+            const wsUrl = 'ws://localhost:3001';
+            ws = new WebSocket(wsUrl);
+            
+            ws.onopen = function(event) {
+                log('WebSocket 연결 성공!');
+                updateStatus('connected', '연결됨');
+                document.getElementById('connectBtn').disabled = true;
+                document.getElementById('disconnectBtn').disabled = false;
+                document.getElementById('testBtn').disabled = false;
+                reconnectAttempts = 0;
+                
+                // 연결 확인 메시지 전송
+                ws.send(JSON.stringify({
+                    type: 'ping',
+                    timestamp: Date.now()
+                }));
+                
+                // 통계 업데이트
+                updateStats();
+                setInterval(updateStats, 5000); // 5초마다 통계 업데이트
+            };
+            
+            ws.onmessage = function(event) {
+                try {
+                    const message = JSON.parse(event.data);
+                    log(`메시지 수신: ${JSON.stringify(message, null, 2)}`);
+                } catch (error) {
+                    log(`메시지 파싱 오류: ${error.message}`);
+                }
+            };
+            
+            ws.onclose = function(event) {
+                log(`연결 종료: 코드=${event.code}, 이유=${event.reason}`);
+                updateStatus('disconnected', '연결 해제됨');
+                document.getElementById('connectBtn').disabled = false;
+                document.getElementById('disconnectBtn').disabled = true;
+                document.getElementById('testBtn').disabled = true;
+                
+                // 자동 재연결 시도
+                if (!event.wasClean && reconnectAttempts < maxReconnectAttempts) {
+                    reconnectAttempts++;
+                    const delay = 1000 * Math.pow(2, reconnectAttempts - 1);
+                    log(`${delay}ms 후 재연결 시도 ${reconnectAttempts}/${maxReconnectAttempts}`);
+                    setTimeout(connect, delay);
+                }
+            };
+            
+            ws.onerror = function(error) {
+                log(`WebSocket 오류: ${error}`);
+                updateStatus('disconnected', '연결 오류');
+            };
+        }
+        
+        function disconnect() {
+            if (ws) {
+                ws.close();
+                ws = null;
+            }
+        }
+        
+        function sendTestMessage() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                log('WebSocket이 연결되지 않았습니다.');
+                return;
+            }
+            
+            const testMessage = {
+                type: 'subscribe_prices',
+                data: { propertyIds: ['property-1', 'property-2'] },
+                timestamp: Date.now()
+            };
+            
+            ws.send(JSON.stringify(testMessage));
+            log(`테스트 메시지 전송: ${JSON.stringify(testMessage, null, 2)}`);
+        }
+        
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+        }
+        
+        // 페이지 로드 시 초기 통계 조회
+        updateStats();
+    </script>
+</body>
+</html> 
