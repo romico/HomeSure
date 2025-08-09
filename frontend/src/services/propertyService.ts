@@ -24,6 +24,11 @@ export interface PropertyRegistrationRequest {
   yearBuilt: number;
   propertyType: 'RESIDENTIAL' | 'COMMERCIAL' | 'INDUSTRIAL' | 'LAND' | 'MIXED';
   metadata: string;
+  title?: string;
+  description?: string;
+  city?: string;
+  country?: string;
+  postalCode?: string;
 }
 
 export interface TokenizationData {
@@ -52,7 +57,7 @@ export interface PropertyToken {
 }
 
 class PropertyService {
-  private baseUrl = '/api/properties';
+  private baseUrl = '/properties';
 
   // 부동산 목록 조회
   async getProperties(params?: {
@@ -89,13 +94,26 @@ class PropertyService {
     return response.data;
   }
 
-  // 부동산 등록 요청 생성
+  // 부동산 등록 (DB 저장)
   async createRegistrationRequest(request: PropertyRegistrationRequest): Promise<{
-    requestId: string;
-    status: string;
-    message: string;
+    property: PropertyData;
   }> {
-    const response = await api.post(`${this.baseUrl}/register`, request);
+    const payload = {
+      title: request.title || `Property at ${request.location}`,
+      description: request.description || request.metadata || '',
+      location: request.location,
+      city: request.city || 'N/A',
+      country: request.country || 'N/A',
+      postalCode: request.postalCode || '00000',
+      propertyType: request.propertyType,
+      totalValue: request.totalValue,
+      landArea: request.landArea,
+      buildingArea: request.buildingArea,
+      yearBuilt: request.yearBuilt,
+      metadata: request.metadata ? { note: request.metadata } : {},
+    } as any;
+
+    const response = await api.post(`/properties`, payload);
     return response.data;
   }
 
@@ -121,7 +139,10 @@ class PropertyService {
     tokenPrice: string;
     transactionHash: string;
   }> {
-    const response = await api.post(`${this.baseUrl}/${tokenizationData.propertyId}/tokenize`, tokenizationData);
+    const response = await api.post(
+      `${this.baseUrl}/${tokenizationData.propertyId}/tokenize`,
+      tokenizationData
+    );
     return response.data;
   }
 
@@ -207,7 +228,7 @@ class PropertyService {
   formatCurrency(amount: string): string {
     return new Intl.NumberFormat('ko-KR', {
       style: 'currency',
-      currency: 'KRW'
+      currency: 'KRW',
     }).format(parseFloat(amount));
   }
 
@@ -219,9 +240,9 @@ class PropertyService {
     return new Date(dateString).toLocaleDateString('ko-KR', {
       year: 'numeric',
       month: '2-digit',
-      day: '2-digit'
+      day: '2-digit',
     });
   }
 }
 
-export const propertyService = new PropertyService(); 
+export const propertyService = new PropertyService();

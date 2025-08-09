@@ -55,6 +55,10 @@ const Button: React.FC<ButtonProps> = ({
         sizeClasses[size],
         className
       )}
+      style={{ minWidth: 44, minHeight: 44 }}
+      onTouchStart={() => {
+        if (navigator.vibrate) navigator.vibrate(10);
+      }}
       disabled={disabled || loading}
       {...props}
     >

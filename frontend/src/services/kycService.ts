@@ -49,7 +49,7 @@ export interface TransactionRiskAssessment {
 }
 
 class KYCService {
-  private baseUrl = '/api/kyc';
+  private baseUrl = '/kyc';
 
   /**
    * KYC 검증 상태 확인
@@ -80,11 +80,14 @@ class KYCService {
   /**
    * AML 거래 위험도 검사
    */
-  async checkTransactionRisk(userAddress: string, amount: number): Promise<TransactionRiskAssessment> {
+  async checkTransactionRisk(
+    userAddress: string,
+    amount: number
+  ): Promise<TransactionRiskAssessment> {
     try {
       const response = await api.post(`${this.baseUrl}/transaction-risk`, {
         userAddress,
-        amount
+        amount,
       });
       return response.data.data;
     } catch (error) {
@@ -109,7 +112,10 @@ class KYCService {
   /**
    * KYC 검증 상태 확인 (기존 호환성)
    */
-  async checkVerificationStatus(sessionId: string, userAddress?: string): Promise<KYCVerificationResult> {
+  async checkVerificationStatus(
+    sessionId: string,
+    userAddress?: string
+  ): Promise<KYCVerificationResult> {
     try {
       const params = userAddress ? { userAddress } : {};
       const response = await api.get(`${this.baseUrl}/session/${sessionId}`, { params });
@@ -223,4 +229,4 @@ class KYCService {
   }
 }
 
-export const kycService = new KYCService(); 
+export const kycService = new KYCService();

@@ -8,7 +8,7 @@ const path = require('path');
 // 환경별 설정 파일 로드
 const env = process.env.NODE_ENV || 'development';
 require('dotenv').config({
-  path: path.resolve(process.cwd(), `.env.${env}`)
+  path: path.resolve(process.cwd(), `.env.${env}`),
 });
 // 기본 .env 파일도 로드 (우선순위 낮음)
 require('dotenv').config();
@@ -33,6 +33,7 @@ const amlRoutes = require('./routes/aml');
 const blockchainRoutes = require('./routes/blockchain');
 const cacheRoutes = require('./routes/cache');
 const adminRoutes = require('./routes/admin');
+const dbtestRoutes = require('./routes/dbtest');
 const tradingRoutes = require('./routes/trading');
 const gdprRoutes = require('./routes/gdpr');
 
@@ -49,9 +50,22 @@ const {
   xssProtection,
   requestLogging,
   additionalSecurityHeaders,
-  requestValidation
+  requestValidation,
 } = require('./middleware/security');
 
+// CORS must be applied before any validators/rate-limiters so that preflight succeeds
+const corsOrigin = process.env.CORS_ORIGIN || 'http://localhost:3000';
+const corsOptions = {
+  origin: corsOrigin,
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+};
+app.use(cors(corsOptions));
+// Explicitly handle preflight
+app.options('*', cors(corsOptions));
+
+// Apply security & validation after CORS
 app.use(securityHeaders);
 app.use(additionalSecurityHeaders);
 app.use(requestLogging);
@@ -61,10 +75,12 @@ app.use(sqlInjectionProtection);
 app.use(xssProtection);
 
 // CORS configuration
-app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
-  credentials: true
-}));
+app.use(
+  cors({
+    origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+    credentials: true,
+  })
+);
 
 // Rate limiting
 app.use('/api/', apiRateLimiter);
@@ -78,31 +94,33 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 if (process.env.NODE_ENV === 'development') {
   app.use(morgan('dev'));
 } else {
-  app.use(morgan('combined', {
-    stream: {
-      write: (message) => logger.info(message.trim())
-    }
-  }));
+  app.use(
+    morgan('combined', {
+      stream: {
+        write: message => logger.info(message.trim()),
+      },
+    })
+  );
 }
 
 // Health check endpoint
 app.get('/health', async (req, res) => {
   try {
     const dbHealth = await database.healthCheck();
-    
+
     res.status(200).json({
       status: 'OK',
       timestamp: new Date().toISOString(),
       uptime: process.uptime(),
       environment: process.env.NODE_ENV,
-      database: dbHealth
+      database: dbHealth,
     });
   } catch (error) {
     logger.error('Health check failed:', error);
     res.status(500).json({
       status: 'ERROR',
       timestamp: new Date().toISOString(),
-      error: error.message
+      error: error.message,
     });
   }
 });
@@ -123,6 +141,7 @@ app.use('/api/cache', cacheRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/trading', tradingRoutes);
 app.use('/api/gdpr', gdprRoutes);
+app.use('/api/dbtest', dbtestRoutes);
 
 // WebSocket 통계 엔드포인트
 app.get('/api/websocket/stats', (req, res) => {
@@ -138,7 +157,7 @@ app.get('/api/websocket/stats', (req, res) => {
       transactionSubscriptions: 0,
       priceDataCount: 0,
       portfolioDataCount: 0,
-      transactionDataCount: 0
+      transactionDataCount: 0,
     });
   }
 });
@@ -158,9 +177,9 @@ app.get('/api', (req, res) => {
       aml: '/api/aml',
       blockchain: '/api/blockchain',
       cache: '/api/cache',
-      admin: '/api/admin'
+      admin: '/api/admin',
     },
-    documentation: '/api/docs'
+    documentation: '/api/docs',
   });
 });
 
@@ -173,8 +192,13 @@ app.use(errorHandler);
 // Start server
 const startServer = async () => {
   try {
-    // Connect to database
-    await database.connect();
+    // Connect to database (optional in development)
+    const disableDb = process.env.DISABLE_DB === '1' || process.env.DISABLE_DB === 'true';
+    if (!disableDb) {
+      await database.connect();
+    } else {
+      logger.warn('🟡 Database connection disabled by DISABLE_DB flag');
+    }
 
     // Initialize cache service
     try {
@@ -191,10 +215,9 @@ const startServer = async () => {
       blockchainConfig.setupEventListeners();
       logger.info('✅ Blockchain connection initialized');
     } catch (error) {
-      logger.warn('⚠️ Blockchain connection failed, continuing without blockchain features');
-      logger.warn('Make sure ETHEREUM_RPC_URL and PRIVATE_KEY are set in environment variables');
+      logger.warn('🟡 Blockchain disabled in development or missing credentials');
     }
-    
+
     const server = app.listen(PORT, () => {
       logger.info(`🚀 HomeSure API Server running on port ${PORT}`);
       logger.info(`📊 Environment: ${process.env.NODE_ENV}`);
@@ -240,13 +263,17 @@ process.on('SIGINT', async () => {
 // Unhandled promise rejection handler
 process.on('unhandledRejection', (reason, promise) => {
   logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
-  process.exit(1);
+  if (process.env.NODE_ENV !== 'development') {
+    process.exit(1);
+  }
 });
 
 // Uncaught exception handler
-process.on('uncaughtException', (error) => {
+process.on('uncaughtException', error => {
   logger.error('Uncaught Exception:', error);
-  process.exit(1);
+  if (process.env.NODE_ENV !== 'development') {
+    process.exit(1);
+  }
 });
 
 module.exports = app;

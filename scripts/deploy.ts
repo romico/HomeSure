@@ -1,4 +1,4 @@
-import { ethers } from 'hardhat';
+import { ethers, network } from 'hardhat';
 
 async function main() {
   try {
@@ -77,7 +77,7 @@ async function main() {
 
     // Save deployment addresses to a file
     const deploymentInfo = {
-      network: (await import('hardhat')).hre.network.name,
+      network: network.name,
       deployer: deployer.address,
       contracts: {
         KYCVerification: kycVerificationAddress,

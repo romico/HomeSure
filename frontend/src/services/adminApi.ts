@@ -128,7 +128,7 @@ export interface PaginationResponse<T> {
 }
 
 class AdminApiService {
-  private baseUrl = '/api/admin';
+  private baseUrl = '/admin';
 
   // KYC 관련 API
   async getKYCUsers(params: {
@@ -151,21 +151,21 @@ class AdminApiService {
   async approveKYC(userId: string, reason?: string, level?: string): Promise<any> {
     const response = await apiService.post(`${this.baseUrl}/kyc/approve/${userId}`, {
       reason,
-      level
+      level,
     });
     return response.data;
   }
 
   async rejectKYC(userId: string, reason: string): Promise<any> {
     const response = await apiService.post(`${this.baseUrl}/kyc/reject/${userId}`, {
-      reason
+      reason,
     });
     return response.data;
   }
 
   async suspendKYC(userId: string, reason: string): Promise<any> {
     const response = await apiService.post(`${this.baseUrl}/kyc/suspend/${userId}`, {
-      reason
+      reason,
     });
     return response.data;
   }
@@ -191,14 +191,14 @@ class AdminApiService {
 
   async resolveAMLAlert(alertId: string, resolution: string): Promise<any> {
     const response = await apiService.put(`${this.baseUrl}/aml/alerts/${alertId}/resolve`, {
-      resolution
+      resolution,
     });
     return response.data;
   }
 
   async escalateAMLAlert(alertId: string, reason: string): Promise<any> {
     const response = await apiService.post(`${this.baseUrl}/aml/alerts/${alertId}/escalate`, {
-      reason
+      reason,
     });
     return response.data;
   }
@@ -232,4 +232,4 @@ class AdminApiService {
   }
 }
 
-export const adminApi = new AdminApiService(); 
+export const adminApi = new AdminApiService();

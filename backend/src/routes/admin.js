@@ -4,6 +4,7 @@ const { authenticateToken } = require('../middleware/auth');
 const adminMiddleware = require('../middleware/admin');
 
 const router = express.Router();
+const database = require('../config/database');
 
 // 모든 관리자 라우트에 인증 및 관리자 권한 미들웨어 적용
 router.use(authenticateToken);
@@ -37,9 +38,23 @@ router.get('/dashboard/overview', adminController.getDashboardOverview);
 router.get('/dashboard/realtime', adminController.getRealtimeData);
 router.get('/dashboard/notifications', adminController.getNotifications);
 
+// DB 연결 상태 및 샘플 조회 테스트
+router.get('/dbtest', async (req, res) => {
+  try {
+    const client = database.getClient ? database.getClient() : null;
+    if (!client) {
+      return res.status(200).json({ ok: true, connected: false });
+    }
+    const users = await client.user.findMany({ take: 3, select: { id: true, email: true } });
+    return res.json({ ok: true, connected: true, sampleUsers: users });
+  } catch (e) {
+    return res.status(200).json({ ok: true, connected: false, error: e.message });
+  }
+});
+
 // 관리자 설정 엔드포인트
 router.get('/settings', adminController.getAdminSettings);
 router.put('/settings', adminController.updateAdminSettings);
 router.get('/settings/audit-logs', adminController.getAdminAuditLogs);
 
-module.exports = router; 
+module.exports = router;

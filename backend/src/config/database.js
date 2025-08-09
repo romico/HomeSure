@@ -76,6 +76,9 @@ class Database {
   // Health check
   async healthCheck() {
     try {
+      if (!this.prisma) {
+        return { status: 'not_connected', timestamp: new Date().toISOString() };
+      }
       await this.prisma.$queryRaw`SELECT 1`;
       return { status: 'healthy', timestamp: new Date().toISOString() };
     } catch (error) {

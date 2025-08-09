@@ -132,7 +132,7 @@ export interface KYCStats {
 }
 
 class AdminKYCService {
-  private baseUrl = '/api/admin/kyc';
+  private baseUrl = '/admin/kyc';
 
   // 대기 중인 KYC 신청 목록 조회
   async getPendingApplications(): Promise<{
@@ -141,13 +141,13 @@ class AdminKYCService {
     timestamp: string;
   }> {
     const response = await api.get(`${this.baseUrl}/pending`);
-    return response.data;
+    return (response as any).data;
   }
 
   // 특정 KYC 신청 상세 정보 조회
   async getApplicationDetail(applicationId: string): Promise<KYCApplicationDetail> {
     const response = await api.get(`${this.baseUrl}/${applicationId}`);
-    return response.data;
+    return (response as any).data;
   }
 
   // KYC 신청 승인
@@ -156,7 +156,7 @@ class AdminKYCService {
     approvalData: ApprovalRequest
   ): Promise<ApprovalResult> {
     const response = await api.post(`${this.baseUrl}/${applicationId}/approve`, approvalData);
-    return response.data;
+    return (response as any).data;
   }
 
   // KYC 신청 거부
@@ -165,15 +165,11 @@ class AdminKYCService {
     rejectionData: RejectionRequest
   ): Promise<RejectionResult> {
     const response = await api.post(`${this.baseUrl}/${applicationId}/reject`, rejectionData);
-    return response.data;
+    return (response as any).data;
   }
 
   // KYC 승인/거부 이력 조회
-  async getHistory(params?: {
-    page?: number;
-    limit?: number;
-    status?: string;
-  }): Promise<{
+  async getHistory(params?: { page?: number; limit?: number; status?: string }): Promise<{
     history: KYCHistoryItem[];
     pagination: {
       page: number;
@@ -188,13 +184,13 @@ class AdminKYCService {
     if (params?.status) queryParams.append('status', params.status);
 
     const response = await api.get(`${this.baseUrl}/history?${queryParams.toString()}`);
-    return response.data;
+    return (response as any).data;
   }
 
   // KYC 통계 정보 조회
   async getStats(): Promise<KYCStats> {
     const response = await api.get(`${this.baseUrl}/stats`);
-    return response.data;
+    return (response as any).data;
   }
 
   // 헬퍼 메서드들
@@ -243,13 +239,18 @@ class AdminKYCService {
       month: '2-digit',
       day: '2-digit',
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
     });
   }
 
-  formatAddress(address: { street: string; city: string; postalCode: string; country: string }): string {
+  formatAddress(address: {
+    street: string;
+    city: string;
+    postalCode: string;
+    country: string;
+  }): string {
     return `${address.street}, ${address.city} ${address.postalCode}`;
   }
 }
 
-export const adminKYCService = new AdminKYCService(); 
+export const adminKYCService = new AdminKYCService();

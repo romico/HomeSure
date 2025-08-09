@@ -85,13 +85,14 @@ else
     exit 1
 fi
 
-# 5. 백엔드 서버 시작
-log_info "백엔드 서버 시작 중..."
+# 5. 백엔드 서버 시작 (실제 API 서버)
+log_info "백엔드 서버 시작 중... (실제 API)"
 cd backend
-node src/server-simple.js > ../logs/backend.log 2>&1 &
+# 실서버 DB 연결을 위해 DISABLE_DB 플래그 제거, 환경변수 파일(.env.development 또는 .env)에 DATABASE_URL 설정 필요
+NODE_ENV=development node src/server.js > ../logs/backend.log 2>&1 &
 BACKEND_PID=$!
 cd ..
-sleep 3
+sleep 4
 
 # 백엔드 서버 상태 확인
 if curl -s http://localhost:3001/health > /dev/null 2>&1; then

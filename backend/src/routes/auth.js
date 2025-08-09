@@ -4,6 +4,11 @@ const authController = require('../controllers/authController');
 const { authenticateToken } = require('../middleware/auth');
 const { validateUserRegistration, validateUserLogin } = require('../middleware/validation');
 const { loginRateLimiter } = require('../middleware/security');
+const { getAuthUrl, getUserFromCode } = require('../services/googleOAuth');
+const TokenService = require('../services/tokenService');
+const SessionService = require('../services/sessionService');
+const { PrismaClient } = require('@prisma/client');
+const prisma = new PrismaClient();
 
 /**
  * @route   POST /api/auth/register
@@ -18,6 +23,59 @@ router.post('/register', validateUserRegistration, authController.register);
  * @access  Public
  */
 router.post('/login', loginRateLimiter, validateUserLogin, authController.login);
+
+/**
+ * @route   GET /api/auth/google
+ * @desc    Start Google OAuth login
+ * @access  Public
+ */
+router.get('/google', (req, res) => {
+  try {
+    const url = getAuthUrl();
+    res.redirect(url);
+  } catch (e) {
+    res.status(500).json({ success: false, error: 'Google OAuth not configured' });
+  }
+});
+
+/**
+ * @route   GET /api/auth/google/callback
+ * @desc    Google OAuth callback
+ * @access  Public
+ */
+router.get('/google/callback', async (req, res) => {
+  try {
+    const { code } = req.query;
+    if (!code) return res.status(400).json({ success: false, error: 'Missing code' });
+    const profile = await getUserFromCode(code);
+
+    // Find or create user
+    let user = await prisma.user.findUnique({ where: { email: profile.email } });
+    if (!user) {
+      user = await prisma.user.create({
+        data: {
+          email: profile.email,
+          password: 'GOOGLE_OAUTH',
+          firstName: profile.givenName || null,
+          lastName: profile.familyName || null,
+          role: 'USER',
+          kycStatus: 'PENDING',
+        },
+      });
+    }
+
+    // Create session and tokens
+    await SessionService.createSession(user.id, req.get('User-Agent'), req.ip);
+    const tokenPair = TokenService.generateTokenPair(user);
+
+    // Redirect back to frontend with tokens (hash fragment to avoid logs)
+    const frontend = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const redirectUrl = `${frontend}/login#accessToken=${encodeURIComponent(tokenPair.accessToken)}&refreshToken=${encodeURIComponent(tokenPair.refreshToken)}`;
+    res.redirect(redirectUrl);
+  } catch (e) {
+    res.status(500).json({ success: false, error: 'Google OAuth failed' });
+  }
+});
 
 /**
  * @route   GET /api/auth/me
@@ -47,4 +105,4 @@ router.post('/refresh', authController.refreshToken);
  */
 router.put('/change-password', authenticateToken, authController.changePassword);
 
-module.exports = router; 
+module.exports = router;

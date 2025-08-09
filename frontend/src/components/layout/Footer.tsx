@@ -79,7 +79,7 @@ const Footer: React.FC = () => {
       <Container maxWidth="xl">
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, marginBottom: 32 }}>
           {/* Brand */}
-          <div style={{ flex: '1 1 300px', minWidth: 0 }}>
+{/*           <div style={{ flex: '1 1 300px', minWidth: 0 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
               <Box
                 sx={{
@@ -104,9 +104,9 @@ const Footer: React.FC = () => {
             <Typography variant="body2" sx={{ color: 'grey.400', lineHeight: 1.6 }}>
             </Typography>
           </div>
-
+ */}
           {/* Main Navigation */}
-          <div style={{ flex: '1 1 300px', minWidth: 0 }}>
+{/*           <div style={{ flex: '1 1 300px', minWidth: 0 }}>
             <Typography
               variant="subtitle2"
               sx={{
@@ -141,7 +141,7 @@ const Footer: React.FC = () => {
                 </Button>
               ))}
             </Box>
-          </div>
+          </div> */}
 
           {/* Support */}
           <div style={{ flex: '1 1 300px', minWidth: 0 }}>

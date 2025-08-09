@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   AppBar, 
   Toolbar, 
@@ -38,12 +39,13 @@ interface Tab {
   id: string;
   name: string;
   icon: React.ComponentType<any>;
+  route?: string;
 }
 
 interface HeaderProps {
   tabs?: Tab[];
-  activeTab?: string;
-  onTabChange?: (tabId: string) => void;
+  activeTab?: string; // deprecated
+  onTabChange?: (tabId: string) => void; // deprecated
 }
 
 const Header: React.FC<HeaderProps> = ({ tabs, activeTab, onTabChange }) => {
@@ -52,9 +54,13 @@ const Header: React.FC<HeaderProps> = ({ tabs, activeTab, onTabChange }) => {
   const { web3State, disconnectWallet } = useWeb3();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('lg'));
+  const navigate = useNavigate();
+  const location = useLocation();
 
-  const handleTabChange = (tabId: string) => {
-    if (onTabChange) {
+  const handleTabChange = (tabId: string, route?: string) => {
+    if (route) {
+      navigate(route);
+    } else if (onTabChange) {
       onTabChange(tabId);
     }
     setIsMobileMenuOpen(false);
@@ -88,7 +94,7 @@ const Header: React.FC<HeaderProps> = ({ tabs, activeTab, onTabChange }) => {
     >
       <Toolbar sx={{ justifyContent: 'space-between' }}>
         {/* Logo */}
-        <Box sx={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }} onClick={() => handleTabChange('portfolio')}>
+        <Box sx={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }} onClick={() => handleTabChange('portfolio', '/portfolio')}>
           <Avatar 
             sx={{ 
               bgcolor: 'primary.main',
@@ -118,17 +124,18 @@ const Header: React.FC<HeaderProps> = ({ tabs, activeTab, onTabChange }) => {
           <Box sx={{ display: 'flex', gap: 1 }}>
             {tabs.map((tab) => {
               const IconComponent = getIconComponent(tab.icon.name);
+              const isActive = tab.route ? location.pathname.startsWith(tab.route) : activeTab === tab.id;
               return (
                 <Button
                   key={tab.id}
-                  onClick={() => handleTabChange(tab.id)}
-                  variant={activeTab === tab.id ? 'contained' : 'text'}
+                  onClick={() => handleTabChange(tab.id, tab.route)}
+                  variant={isActive ? 'contained' : 'text'}
                   startIcon={<IconComponent />}
                   sx={{
                     borderRadius: 2,
                     textTransform: 'none',
                     fontWeight: 500,
-                    ...(activeTab === tab.id && {
+                    ...(isActive && {
                       backgroundColor: 'primary.main',
                       color: 'white',
                       '&:hover': {
@@ -249,15 +256,15 @@ const Header: React.FC<HeaderProps> = ({ tabs, activeTab, onTabChange }) => {
                 return (
                   <ListItem
                     key={tab.id}
-                    onClick={() => handleTabChange(tab.id)}
+                    onClick={() => handleTabChange(tab.id, tab.route)}
                     sx={{
                       borderRadius: 2,
                       mb: 1,
                       cursor: 'pointer',
-                      backgroundColor: activeTab === tab.id ? 'primary.main' : 'transparent',
-                      color: activeTab === tab.id ? 'white' : 'inherit',
+                      backgroundColor: (tab.route ? location.pathname.startsWith(tab.route) : activeTab === tab.id) ? 'primary.main' : 'transparent',
+                      color: (tab.route ? location.pathname.startsWith(tab.route) : activeTab === tab.id) ? 'white' : 'inherit',
                       '&:hover': {
-                        backgroundColor: activeTab === tab.id ? 'primary.dark' : 'action.hover',
+                        backgroundColor: (tab.route ? location.pathname.startsWith(tab.route) : activeTab === tab.id) ? 'primary.dark' : 'action.hover',
                       }
                     }}
                   >

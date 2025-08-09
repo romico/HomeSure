@@ -1,5 +1,3 @@
-import { create } from 'ipfs-http-client';
-
 interface CacheItem<T> {
   data: T;
   timestamp: number;
@@ -19,7 +17,7 @@ class CacheService {
     hits: 0,
     misses: 0,
     size: 0,
-    hitRate: 0
+    hitRate: 0,
   };
   private maxSize = 1000; // 최대 캐시 항목 수
   private defaultTTL = 5 * 60 * 1000; // 5분
@@ -36,7 +34,7 @@ class CacheService {
     const item: CacheItem<T> = {
       data,
       timestamp: Date.now(),
-      ttl
+      ttl,
     };
 
     this.cache.set(key, item);
@@ -49,7 +47,7 @@ class CacheService {
    */
   get<T>(key: string): T | null {
     const item = this.cache.get(key);
-    
+
     if (!item) {
       this.stats.misses++;
       this.updateHitRate();
@@ -145,7 +143,7 @@ class CacheService {
   cleanup(): void {
     const now = Date.now();
     const keysToDelete: string[] = [];
-    
+
     this.cache.forEach((item, key) => {
       if (now - item.timestamp > item.ttl) {
         keysToDelete.push(key);
@@ -207,7 +205,7 @@ class CacheService {
   invalidatePattern(pattern: string): void {
     const regex = new RegExp(pattern);
     const keysToDelete: string[] = [];
-    
+
     this.cache.forEach((_, key) => {
       if (regex.test(key)) {
         keysToDelete.push(key);
@@ -244,7 +242,7 @@ class CacheService {
     return {
       exists: true,
       age,
-      ttl: item.ttl
+      ttl: item.ttl,
     };
   }
 }
@@ -267,4 +265,4 @@ if (process.env.NODE_ENV === 'development') {
   }, 300000); // 5분마다
 }
 
-export default cacheService; 
+export default cacheService;

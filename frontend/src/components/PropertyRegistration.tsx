@@ -45,6 +45,7 @@ const PropertyRegistration: React.FC = () => {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>('');
+  const [toast, setToast] = useState<ToastMessage | null>(null);
   const [step, setStep] = useState<'form' | 'review' | 'success'>('form');
 
   const handleInputChange = (e: any) => {
@@ -93,14 +94,28 @@ const PropertyRegistration: React.FC = () => {
   const handleConfirm = async () => {
     setLoading(true);
     try {
-      const response = await propertyService.createRegistrationRequest(formData);
+      const res = await propertyService.createRegistrationRequest(formData);
       setError('');
+      setToast({ type: 'success', message: '부동산 등록 요청이 접수되었습니다.' });
+      // 폼 리셋 및 완료 단계 이동
+      setFormData({
+        location: '',
+        totalValue: '',
+        landArea: 0,
+        buildingArea: 0,
+        yearBuilt: new Date().getFullYear(),
+        propertyType: 'RESIDENTIAL',
+        metadata: ''
+      });
       setStep('success');
-    } catch (error) {
-      console.error('Registration failed:', error);
+    } catch (err: any) {
+      console.error('Registration failed:', err);
+      setToast({ type: 'error', message: err?.message || '부동산 등록에 실패했습니다. 다시 시도해주세요.' });
       setError('부동산 등록에 실패했습니다. 다시 시도해주세요.');
     } finally {
       setLoading(false);
+      // 토스트 자동 닫힘
+      setTimeout(() => setToast(null), 2000);
     }
   };
 
@@ -120,6 +135,11 @@ const PropertyRegistration: React.FC = () => {
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+      {toast && (
+        <Alert severity={toast.type} onClose={() => setToast(null)}>
+          {toast.message}
+        </Alert>
+      )}
       {/* 헤더 */}
       <Typography variant="h4" sx={{ fontWeight: 600 }}>
         부동산 등록

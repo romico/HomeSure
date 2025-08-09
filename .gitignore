@@ -59,3 +59,12 @@ ignition/deployments/chain-31337
 
 # Process ID files
 *.pid
+
+# Google OAuth 클라이언트 시크릿 파일들
+client_secret_*.apps.googleusercontent.com.json
+
+# 더 포괄적인 Google 인증 관련 파일들
+**/client_secret_*.json
+**/service_account_*.json
+google_credentials*.json
+gcp_*.json

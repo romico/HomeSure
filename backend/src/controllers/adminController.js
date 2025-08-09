@@ -1,6 +1,7 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 const logger = require('../utils/logger');
+const { sendMail } = require('../services/emailService');
 
 class AdminController {
   /**
@@ -170,7 +171,7 @@ class AdminController {
   async approveKYC(req, res) {
     try {
       const { userId } = req.params;
-      const { reason, level = 'BASIC' } = req.body;
+      const { reason, level = 'BASIC', notifyEmail } = req.body;
       const adminId = req.user.id;
 
       // 사용자 인증 정보 조회
@@ -227,6 +228,20 @@ class AdminController {
 
       logger.info(`KYC 승인 완료: ${userId} by ${adminId}`);
 
+      // 이메일 알림
+      try {
+        if (notifyEmail && verification.user?.email) {
+          await sendMail({
+            to: verification.user.email,
+            subject: '[HomeSure] KYC 승인 안내',
+            text: `안녕하세요, KYC가 승인되었습니다. 레벨: ${level}`,
+            html: `<p>안녕하세요,</p><p>KYC가 승인되었습니다. 레벨: <b>${level}</b></p>`,
+          });
+        }
+      } catch (e) {
+        logger.warn('KYC 승인 이메일 발송 실패:', e.message);
+      }
+
       res.status(200).json({
         success: true,
         data: result,
@@ -248,7 +263,7 @@ class AdminController {
   async rejectKYC(req, res) {
     try {
       const { userId } = req.params;
-      const { reason } = req.body;
+      const { reason, notifyEmail } = req.body;
       const adminId = req.user.id;
 
       if (!reason) {
@@ -294,6 +309,24 @@ class AdminController {
       });
 
       logger.info(`KYC 거부 완료: ${userId} by ${adminId} - ${reason}`);
+
+      // 이메일 알림
+      try {
+        const user = await prisma.user.findUnique({
+          where: { id: userId },
+          select: { email: true },
+        });
+        if (notifyEmail && user?.email) {
+          await sendMail({
+            to: user.email,
+            subject: '[HomeSure] KYC 거절 안내',
+            text: `안녕하세요, 제출하신 KYC가 거절되었습니다. 사유: ${reason}`,
+            html: `<p>안녕하세요,</p><p>제출하신 KYC가 거절되었습니다.</p><p>사유: <b>${reason}</b></p>`,
+          });
+        }
+      } catch (e) {
+        logger.warn('KYC 거절 이메일 발송 실패:', e.message);
+      }
 
       res.status(200).json({
         success: true,
