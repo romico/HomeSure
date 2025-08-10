@@ -242,9 +242,31 @@ npm run deploy
 
 ## 🧪 테스트
 
+### WebSocket 테스트
+
+실시간 WebSocket 기능을 테스트하려면:
+
+```bash
+# 모든 WebSocket 테스트 실행
+npm run websocket:test
+
+# 개별 테스트
+npm run websocket:test:basic      # 기본 연결 테스트
+npm run websocket:test:price      # 가격 구독 테스트
+npm run websocket:test:portfolio  # 포트폴리오 구독 테스트
+npm run websocket:test:transaction # 거래 구독 테스트
+
+# 대화형 테스트
+npm run websocket:test:interactive
+```
+
+자세한 내용은 [WebSocket 테스트 가이드](docs/WEBSOCKET_TESTING.md)를 참조하세요.
+
+### 기타 테스트
+
 ```bash
 # 스마트 컨트랙트 테스트
-npx hardhat test
+npm test
 
 # 통합 테스트
 npm run test:integration
@@ -281,3 +303,65 @@ npm run test:e2e
 - [Ethers.js](https://docs.ethers.io/) - 블록체인 라이브러리
 - [MUI CSS](https://mui.com/) - CSS 프레임워크
 - [IPFS](https://ipfs.io/) - 분산 파일 시스템
+
+## WebSocket 테스트
+
+### 기본 테스트
+
+```bash
+# 기본 WebSocket 테스트
+npm run websocket:test
+
+# 성능 테스트
+npm run websocket:performance
+
+# 고급 테스트 (jq 활용)
+npm run websocket:advanced
+
+# jq 사용 예시
+./scripts/jq-examples.sh
+```
+
+### jq를 활용한 JSON 파싱
+
+프로젝트에서는 `jq`를 활용하여 JSON 응답을 구조적으로 분석하고 파싱합니다.
+
+#### 설치
+
+```bash
+# macOS
+brew install jq
+
+# Ubuntu/Debian
+sudo apt-get install jq
+
+# CentOS/RHEL
+sudo yum install jq
+```
+
+#### 사용 예시
+
+```bash
+# 서버 통계 파싱
+curl -s -H "Accept: application/json" http://localhost:3001/api/websocket/stats | jq -r '
+    "활성화: " + (.enabled | tostring) +
+    "\n총 클라이언트: " + (.totalClients | tostring) +
+    "\n가격 구독: " + (.priceSubscriptions | tostring)
+'
+
+# JSON 구조 분석
+curl -s -H "Accept: application/json" http://localhost:3001/api/websocket/stats | jq -r 'keys | .[]'
+
+# 성능 메트릭 계산
+curl -s -H "Accept: application/json" http://localhost:3001/api/websocket/stats | jq -r '
+    "총 구독: " + (.priceSubscriptions + .portfolioSubscriptions + .transactionSubscriptions | tostring)
+'
+```
+
+#### 주요 기능
+
+- **구조적 분석**: JSON 키 구조 자동 분석
+- **실시간 계산**: 응답 시간, 성공률 등 실시간 계산
+- **오류 분석**: 오류 메시지 구조적 파싱
+- **설정 모니터링**: 서버 설정 정보 상세 표시
+- **성능 추적**: 성능 메트릭 자동 계산

@@ -63,7 +63,7 @@ export const Web3Provider: React.FC<Web3ProviderProps> = ({ children }) => {
         setWalletAddress(newAccount);
       }
     });
-  }, [setWalletAddress]);
+  }, []); // setWalletAddress는 이미 메모이제이션됨
 
   const checkConnectionState = async () => {
     try {

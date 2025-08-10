@@ -113,7 +113,7 @@ const Portfolio: React.FC = () => {
   };
 
   // 데이터 로드
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
       // 실제 구현에서는 API 호출
@@ -131,15 +131,23 @@ const Portfolio: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [showSuccess, showError]);
 
   // 실시간 구독 설정
   useEffect(() => {
-    if (web3State.isConnected && web3State.account) {
-      subscribeToPortfolio();
-      subscribeToTransactions();
+    if (web3State.isConnected && web3State.account && realTimeState.isConnected) {
+      console.log('포트폴리오 컴포넌트: 실시간 구독 설정');
+      // 구독 전에 약간의 지연을 두어 연결이 안정화되도록 함
+      const subscriptionTimer = setTimeout(() => {
+        subscribeToPortfolio();
+        subscribeToTransactions();
+      }, 500);
+      
+      return () => {
+        clearTimeout(subscriptionTimer);
+      };
     }
-  }, [web3State.isConnected, web3State.account, subscribeToPortfolio, subscribeToTransactions]);
+  }, [web3State.isConnected, web3State.account, realTimeState.isConnected]); // subscribeToPortfolio, subscribeToTransactions는 이미 useCallback으로 메모이제이션됨
 
   // 온라인/오프라인 상태 감지
   useEffect(() => {
@@ -160,7 +168,7 @@ const Portfolio: React.FC = () => {
     if (web3State.isConnected) {
       loadData();
     }
-  }, [web3State.isConnected]);
+  }, [web3State.isConnected, loadData]); // loadData는 컴포넌트 내부에서 정의되므로 의존성에서 제외
 
   // 캐시 정리
   const handleClearCache = async () => {

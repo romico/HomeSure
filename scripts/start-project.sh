@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# HomeSure 프로젝트 실행 스크립트
-# 모든 컴포넌트를 순차적으로 시작합니다.
+# HomeSure 프로젝트 시작 스크립트
+# 블록체인 노드, 백엔드, 프론트엔드를 순차적으로 시작합니다.
 
 set -e
 
@@ -13,52 +13,53 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # 로그 함수
-log_info() {
-    echo -e "${BLUE}[INFO]${NC} $1"
-}
+log_info() { echo -e "${BLUE}[INFO]${NC} $1"; }
+log_success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
+log_warning() { echo -e "${YELLOW}[WARNING]${NC} $1"; }
+log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
 
-log_success() {
-    echo -e "${GREEN}[SUCCESS]${NC} $1"
-}
-
-log_warning() {
-    echo -e "${YELLOW}[WARNING]${NC} $1"
-}
-
-log_error() {
-    echo -e "${RED}[ERROR]${NC} $1"
-}
+# 로그 및 PID 디렉토리 생성
+mkdir -p logs .pids
 
 # 프로젝트 루트 디렉토리 확인
 if [ ! -f "package.json" ]; then
-    log_error "이 스크립트는 프로젝트 루트 디렉토리에서 실행해야 합니다."
+    log_error "package.json을 찾을 수 없습니다. 프로젝트 루트 디렉토리에서 실행해주세요."
     exit 1
 fi
 
-log_info "🏠 HomeSure 프로젝트 시작 중..."
-
-# 1. 기존 프로세스 정리
+# 기존 프로세스 정리
 log_info "기존 프로세스 정리 중..."
-pkill -f "hardhat node" || true
-pkill -f "node src/server-simple.js" || true
-pkill -f "npm start" || true
-sleep 2
+./scripts/stop-project.sh >/dev/null 2>&1 || true
 
-# 2. 의존성 확인
-log_info "의존성 확인 중..."
+# wscat 설치 확인 및 설치
+check_wscat() {
+    if ! command -v wscat &> /dev/null; then
+        log_warning "wscat이 설치되지 않았습니다. WebSocket 테스트를 위해 설치합니다."
+        log_info "wscat 설치 중..."
+        npm install -g wscat
+        log_success "wscat 설치 완료"
+    else
+        log_success "wscat이 이미 설치되어 있습니다."
+    fi
+}
+
+# wscat 설치 확인
+check_wscat
+
+# 루트 의존성 설치
 if [ ! -d "node_modules" ]; then
     log_warning "루트 의존성이 설치되지 않았습니다. 설치 중..."
-    npm install
+    npm install --legacy-peer-deps
 fi
 
 if [ ! -d "backend/node_modules" ]; then
     log_warning "백엔드 의존성이 설치되지 않았습니다. 설치 중..."
-    cd backend && npm install && cd ..
+    cd backend && npm install --no-audit --no-fund --legacy-peer-deps && cd ..
 fi
 
 if [ ! -d "frontend/node_modules" ]; then
     log_warning "프론트엔드 의존성이 설치되지 않았습니다. 설치 중..."
-    cd frontend && npm install && cd ..
+    cd frontend && npm install --no-audit --no-fund --legacy-peer-deps && cd ..
 fi
 
 # 3. 블록체인 노드 시작

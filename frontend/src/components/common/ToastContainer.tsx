@@ -71,12 +71,14 @@ const ToastContainer: React.FC<ToastContainerProps> = ({ children }) => {
   return (
     <ToastContext.Provider value={contextValue}>
       {children}
-      <div className="fixed top-4 right-4 z-50 space-y-2">
+      {/* 토스트 컨테이너 - 반응형 디자인으로 모바일과 데스크톱 모두 지원 */}
+      <div className="fixed top-4 right-4 sm:top-6 sm:right-6 z-[9999] space-y-2 sm:space-y-3 w-full max-w-xs sm:max-w-sm md:max-w-md px-4 sm:px-0">
         {toasts.map((toast, index) => (
           <div
             key={toast.id}
+            className="transform transition-all duration-300 ease-out"
             style={{
-              transform: `translateY(${index * 80}px)`,
+              transform: `translateY(${index * 85}px)`,
             }}
           >
             <Toast

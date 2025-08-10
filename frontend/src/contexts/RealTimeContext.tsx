@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
+import React, { createContext, useState, useEffect, useCallback, useRef } from 'react';
 import webSocketService, { PriceData, PortfolioUpdate, TransactionUpdate } from '../services/websocket';
 import cacheService from '../services/cache';
 import { useToast } from '../components/common/ToastContainer';
@@ -20,14 +20,18 @@ interface RealTimeContextType {
   subscribeToPrices: (propertyIds: string[]) => void;
   subscribeToPortfolio: () => void;
   subscribeToTransactions: () => void;
+  unsubscribeFromPrices: (propertyIds: string[]) => void;
+  unsubscribeFromPortfolio: () => void;
+  unsubscribeFromTransactions: () => void;
   refreshData: () => void;
   clearCache: () => void;
+  getSubscriptionStats: () => { total: number; max: number; subscriptions: string[] };
 }
 
 const RealTimeContext = createContext<RealTimeContextType | undefined>(undefined);
 
 export const useRealTime = (): RealTimeContextType => {
-  const context = useContext(RealTimeContext);
+  const context = React.useContext(RealTimeContext);
   if (!context) {
     throw new Error('useRealTime must be used within a RealTimeProvider');
   }
@@ -53,16 +57,41 @@ export const RealTimeProvider: React.FC<RealTimeProviderProps> = ({ children }) 
   });
 
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const priceUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Toast 함수 설정
+  // Toast 함수 설정 - useCallback으로 메모이제이션
+  const toastFunctions = useCallback(() => ({
+    showSuccess,
+    showError,
+    showInfo
+  }), [showSuccess, showError, showInfo]);
+
   useEffect(() => {
-    webSocketService.setToastFunction({ showSuccess, showError, showInfo });
-  }, [showSuccess, showError, showInfo]);
+    webSocketService.setToastFunction(toastFunctions());
+  }, [toastFunctions]);
 
   // WebSocket 연결 관리
   const connectWebSocket = useCallback(async () => {
-    if (state.connectionStatus === 'connecting') return;
+    if (state.connectionStatus === 'connecting') {
+      console.log('이미 연결 중입니다. 중복 연결을 건너뜁니다.');
+      return;
+    }
+
+    if (state.isConnected) {
+      console.log('이미 연결되어 있습니다. 중복 연결을 건너뜁니다.');
+      return;
+    }
+
+    // 최대 재연결 시도 횟수에 도달하면 폴백 모드로 전환
+    if (state.reconnectAttempts >= 5) {
+      console.log('최대 재연결 시도 횟수에 도달했습니다. 폴백 모드로 전환');
+      setState(prev => ({ 
+        ...prev, 
+        connectionStatus: 'connected',
+        isConnected: true // 폴백 모드에서도 연결된 것으로 표시
+      }));
+      showInfo('실시간 연결에 실패했지만 폴백 모드로 작동 중입니다.');
+      return;
+    }
 
     console.log('WebSocket 연결 시도 중...');
     console.log('환경 변수 확인:', {
@@ -78,22 +107,37 @@ export const RealTimeProvider: React.FC<RealTimeProviderProps> = ({ children }) 
       console.log('사용할 WebSocket URL:', wsUrl);
       
       await webSocketService.connect(wsUrl);
-      setState(prev => ({ 
-        ...prev, 
-        isConnected: true, 
-        connectionStatus: 'connected',
-        reconnectAttempts: 0
-      }));
       
-      showSuccess('실시간 연결이 설정되었습니다.');
+      // 연결 성공 여부 확인
+      if (webSocketService.isConnectedState()) {
+        setState(prev => ({ 
+          ...prev, 
+          isConnected: true, 
+          connectionStatus: 'connected',
+          reconnectAttempts: 0
+        }));
+        
+        showSuccess('실시간 연결이 설정되었습니다.');
+      } else {
+        // WebSocket 연결 실패했지만 폴백 모드로 작동 중
+        setState(prev => ({ 
+          ...prev, 
+          connectionStatus: 'connected',
+          reconnectAttempts: 0,
+          isConnected: true // 폴백 모드에서도 연결된 것으로 표시
+        }));
+        
+        showInfo('실시간 연결에 실패했지만 폴백 모드로 작동 중입니다.');
+      }
     } catch (error) {
       console.error('WebSocket 연결 실패:', error);
       setState(prev => ({ 
         ...prev, 
-        connectionStatus: 'error' 
+        connectionStatus: 'error',
+        isConnected: false
       }));
       
-      showError('실시간 연결에 실패했습니다.', '잠시 후 다시 시도됩니다.');
+      showError('실시간 연결에 실패했습니다.', '폴백 모드로 전환됩니다.');
       
       // 재연결 시도 (지수 백오프)
       if (reconnectTimeoutRef.current) {
@@ -105,16 +149,35 @@ export const RealTimeProvider: React.FC<RealTimeProviderProps> = ({ children }) 
         connectWebSocket();
       }, retryDelay);
     }
-  }, [state.connectionStatus, state.reconnectAttempts, showSuccess, showError]);
+  }, [state.connectionStatus, state.isConnected, state.reconnectAttempts, showSuccess, showError, showInfo]);
 
   // WebSocket 연결 해제
   const disconnectWebSocket = useCallback(() => {
-    webSocketService.disconnect();
-    setState(prev => ({ 
-      ...prev, 
-      isConnected: false, 
-      connectionStatus: 'disconnected' 
-    }));
+    console.log('RealTimeContext: WebSocket 연결 해제 시작');
+    
+    try {
+      // WebSocket 서비스 연결 해제
+      webSocketService.disconnect();
+      
+      // 상태 초기화
+      setState(prev => ({
+        ...prev,
+        isConnected: false,
+        connectionStatus: 'disconnected',
+        reconnectAttempts: 0
+      }));
+      
+      console.log('RealTimeContext: WebSocket 연결 해제 완료');
+    } catch (error) {
+      console.error('RealTimeContext: WebSocket 연결 해제 중 오류:', error);
+      // 오류가 발생해도 상태는 초기화
+      setState(prev => ({
+        ...prev,
+        isConnected: false,
+        connectionStatus: 'error',
+        reconnectAttempts: 0
+      }));
+    }
   }, []);
 
   // 가격 데이터 업데이트 (throttled)
@@ -170,7 +233,7 @@ export const RealTimeProvider: React.FC<RealTimeProviderProps> = ({ children }) 
     });
   }, []);
 
-  // WebSocket 이벤트 구독
+  // WebSocket 이벤트 구독 - 메모이제이션된 함수들 사용
   useEffect(() => {
     if (!state.isConnected) return;
 
@@ -183,15 +246,41 @@ export const RealTimeProvider: React.FC<RealTimeProviderProps> = ({ children }) 
       unsubscribePortfolio();
       unsubscribeTransaction();
     };
-  }, [state.isConnected, updatePriceData, updatePortfolioData, updateTransactionData]);
+  }, [state.isConnected]); // updatePriceData, updatePortfolioData, updateTransactionData는 이미 useCallback으로 메모이제이션됨
 
   // 지갑 연결 상태에 따른 WebSocket 연결 관리
   useEffect(() => {
-    if (web3State.isConnected && web3State.account) {
-      connectWebSocket();
-    } else {
-      disconnectWebSocket();
-    }
+    const connectIfNeeded = async () => {
+      if (web3State.isConnected && web3State.account) {
+        // 지갑이 연결되어 있고 계정이 있을 때만 WebSocket 연결
+        console.log('지갑 연결됨, WebSocket 연결 시도:', web3State.account);
+        try {
+          await connectWebSocket();
+          // 연결 성공 후 구독 설정 (폴백 모드에서도 작동)
+          setTimeout(() => {
+            if (state.isConnected && web3State.account) {
+              console.log('연결 후 구독 설정');
+              webSocketService.subscribeToPortfolioUpdates(web3State.account);
+              webSocketService.subscribeToTransactionUpdates(web3State.account);
+            }
+          }, 1000); // 연결 후 1초 대기 후 구독
+        } catch (error) {
+          console.error('WebSocket 연결 실패:', error);
+          // 연결 실패 시에도 폴백 모드로 구독 시도
+          if (web3State.account) {
+            console.log('폴백 모드에서 구독 시도');
+            webSocketService.subscribeToPortfolioUpdates(web3State.account);
+            webSocketService.subscribeToTransactionUpdates(web3State.account);
+          }
+        }
+      } else {
+        // 지갑이 연결되지 않았으면 WebSocket 연결 해제
+        console.log('지갑 연결 해제됨, WebSocket 연결 해제');
+        disconnectWebSocket();
+      }
+    };
+
+    connectIfNeeded();
 
     return () => {
       disconnectWebSocket();
@@ -199,7 +288,7 @@ export const RealTimeProvider: React.FC<RealTimeProviderProps> = ({ children }) 
         clearTimeout(reconnectTimeoutRef.current);
       }
     };
-  }, [web3State.isConnected, web3State.account, connectWebSocket, disconnectWebSocket]);
+  }, [web3State.isConnected, web3State.account]); // connectWebSocket, disconnectWebSocket, state.isConnected는 이미 useCallback으로 메모이제이션됨
 
   // 캐시된 데이터 복원
   useEffect(() => {
@@ -254,28 +343,74 @@ export const RealTimeProvider: React.FC<RealTimeProviderProps> = ({ children }) 
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
-  }, [web3State.isConnected, connectWebSocket, showInfo]);
+  }, [web3State.isConnected]); // connectWebSocket, showInfo는 이미 useCallback으로 메모이제이션됨
 
   // 가격 구독 함수
   const subscribeToPrices = useCallback((propertyIds: string[]) => {
-    if (state.isConnected) {
+    if (state.isConnected && propertyIds.length > 0) {
+      console.log('가격 구독 요청:', propertyIds);
+      
+      // 구독 통계 확인
+      const stats = webSocketService.getSubscriptionStats();
+      console.log('현재 구독 상태:', stats);
+      
       webSocketService.subscribeToPriceUpdates(propertyIds);
+    } else {
+      console.log('가격 구독 건너뜀 - 연결되지 않음 또는 빈 propertyIds');
     }
   }, [state.isConnected]);
 
   // 포트폴리오 구독 함수
   const subscribeToPortfolio = useCallback(() => {
     if (state.isConnected && web3State.account) {
+      console.log('포트폴리오 구독 요청:', web3State.account);
+      
+      // 구독 통계 확인
+      const stats = webSocketService.getSubscriptionStats();
+      console.log('현재 구독 상태:', stats);
+      
       webSocketService.subscribeToPortfolioUpdates(web3State.account);
+    } else {
+      console.log('포트폴리오 구독 건너뜀 - 연결되지 않음 또는 계정 없음');
     }
   }, [state.isConnected, web3State.account]);
 
   // 거래 구독 함수
   const subscribeToTransactions = useCallback(() => {
     if (state.isConnected && web3State.account) {
+      console.log('거래 구독 요청:', web3State.account);
+      
+      // 구독 통계 확인
+      const stats = webSocketService.getSubscriptionStats();
+      console.log('현재 구독 상태:', stats);
+      
       webSocketService.subscribeToTransactionUpdates(web3State.account);
+    } else {
+      console.log('거래 구독 건너뜀 - 연결되지 않음 또는 계정 없음');
     }
   }, [state.isConnected, web3State.account]);
+
+  // 구독 해제 함수들
+  const unsubscribeFromPrices = useCallback((propertyIds: string[]) => {
+    if (propertyIds.length > 0) {
+      console.log('가격 구독 해제:', propertyIds);
+      webSocketService.unsubscribeFromPriceUpdates(propertyIds);
+    }
+  }, []);
+
+  const unsubscribeFromPortfolio = useCallback(() => {
+    if (web3State.account) {
+      console.log('포트폴리오 구독 해제:', web3State.account);
+      webSocketService.unsubscribeFromPortfolioUpdates(web3State.account);
+    }
+  }, [web3State.account]);
+
+  const unsubscribeFromTransactions = useCallback(() => {
+    if (web3State.account) {
+      console.log('거래 구독 해제:', web3State.account);
+      webSocketService.unsubscribeFromTransactionUpdates(web3State.account);
+    }
+  }, [web3State.account]);
 
   // 데이터 새로고침
   const refreshData = useCallback(() => {
@@ -303,8 +438,12 @@ export const RealTimeProvider: React.FC<RealTimeProviderProps> = ({ children }) 
     subscribeToPrices,
     subscribeToPortfolio,
     subscribeToTransactions,
+    unsubscribeFromPrices,
+    unsubscribeFromPortfolio,
+    unsubscribeFromTransactions,
     refreshData,
     clearCache,
+    getSubscriptionStats: webSocketService.getSubscriptionStats,
   };
 
   return (

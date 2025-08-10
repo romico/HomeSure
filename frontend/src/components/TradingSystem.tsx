@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   TrendingUp,
   TrendingDown,
@@ -93,40 +93,40 @@ const TradingSystem: React.FC = () => {
   const [orderBook, setOrderBook] = useState<OrderBook>({ buyOrders: [], sellOrders: [] });
   const [activeTab, setActiveTab] = useState<'orderbook' | 'orders' | 'trades'>('orderbook');
 
-  useEffect(() => {
-    if (web3State.isConnected) {
-      loadOrders();
-      loadTrades();
-      loadOrderBook();
-    }
-  }, [web3State.isConnected, selectedProperty]);
-
-  const loadOrders = async () => {
+  const loadOrders = useCallback(async () => {
     try {
       const response = await tradingService.getOrders({ propertyId: selectedProperty });
       setOrders(response.data.orders);
     } catch (error) {
       console.error('Failed to load orders:', error);
     }
-  };
+  }, [selectedProperty]);
 
-  const loadTrades = async () => {
+  const loadTrades = useCallback(async () => {
     try {
       const response = await tradingService.getTrades({ propertyId: selectedProperty });
       setTrades(response.data.trades);
     } catch (error) {
       console.error('Failed to load trades:', error);
     }
-  };
+  }, [selectedProperty]);
 
-  const loadOrderBook = async () => {
+  const loadOrderBook = useCallback(async () => {
     try {
       const response = await tradingService.getOrderBook(selectedProperty);
       setOrderBook(response.data);
     } catch (error) {
       console.error('Failed to load order book:', error);
     }
-  };
+  }, [selectedProperty]);
+
+  useEffect(() => {
+    if (web3State.isConnected) {
+      loadOrders();
+      loadTrades();
+      loadOrderBook();
+    }
+  }, [web3State.isConnected, selectedProperty, loadOrders, loadTrades, loadOrderBook]);
 
   const handleCreateOrder = async () => {
     if (!price || !quantity || !expiryTime) {

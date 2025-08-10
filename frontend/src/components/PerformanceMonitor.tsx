@@ -94,7 +94,7 @@ const PerformanceMonitor: React.FC = () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
-  }, []);
+  }, []); // 의존성 배열을 비워서 컴포넌트 마운트 시에만 실행
 
   const getStatusColor = (value: number, thresholds: { good: number; warning: number }) => {
     if (value <= thresholds.good) return 'success.main';

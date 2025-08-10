@@ -1,0 +1,70 @@
+name: WebSocket Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'backend/src/services/websocketService.js'
+      - 'frontend/src/services/websocket.ts'
+      - 'scripts/websocket-test.sh'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'backend/src/services/websocketService.js'
+      - 'frontend/src/services/websocket.ts'
+      - 'scripts/websocket-test.sh'
+
+jobs:
+  websocket-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: |
+        npm install --legacy-peer-deps
+        cd backend && npm install --legacy-peer-deps
+        cd ../frontend && npm install --legacy-peer-deps
+        cd ..
+        
+    - name: Install wscat
+      run: npm install -g wscat
+      
+    - name: Start backend server
+      run: |
+        cd backend
+        npm install --legacy-peer-deps
+        npx prisma generate
+        NODE_ENV=development node src/server.js > ../logs/backend.log 2>&1 &
+        echo $! > ../.pids/backend.pid
+        sleep 10
+        
+    - name: Run WebSocket tests
+      run: |
+        # 서버 상태 확인
+        curl -H "Accept: application/json" http://localhost:3001/health
+        
+        # WebSocket 테스트 실행
+        ./scripts/websocket-test.sh all
+        
+    - name: Upload logs
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: websocket-test-logs
+        path: logs/
+        
+    - name: Cleanup
+      if: always()
+      run: |
+        if [ -f .pids/backend.pid ]; then
+          kill $(cat .pids/backend.pid) 2>/dev/null || true
+        fi

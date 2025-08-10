@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
@@ -79,13 +79,7 @@ const KYCSystem: React.FC = () => {
   const [verificationId, setVerificationId] = useState<string>('');
   const [error, setError] = useState<string>('');
 
-  useEffect(() => {
-    if (account) {
-      checkKYCStatus();
-    }
-  }, [account]);
-
-  const checkKYCStatus = async () => {
+  const checkKYCStatus = useCallback(async () => {
     if (!account) return;
     
     try {
@@ -102,7 +96,13 @@ const KYCSystem: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [account]);
+
+  useEffect(() => {
+    if (account) {
+      checkKYCStatus();
+    }
+  }, [account, checkKYCStatus]);
 
   const handleInputChange = (e: any) => {
     const { name, value, type } = e.target;
