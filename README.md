@@ -365,3 +365,8 @@ curl -s -H "Accept: application/json" http://localhost:3001/api/websocket/stats 
 - **오류 분석**: 오류 메시지 구조적 파싱
 - **설정 모니터링**: 서버 설정 정보 상세 표시
 - **성능 추적**: 성능 메트릭 자동 계산
+
+
+#### 스크린샷
+[스크린샷](docs/demo-screens.md)
+
