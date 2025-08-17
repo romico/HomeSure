@@ -74,7 +74,7 @@ HomeSure는 부동산 투자를 더욱 쉽고 투명하게 만드는 블록체�
 ### 1. 저장소 클론
 
 ```bash
-git clone https://github.com/your-username/homesure.git
+git clone https://github.com/romico/HomeSure.git
 cd homesure
 ```
 
